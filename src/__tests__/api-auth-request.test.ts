@@ -89,7 +89,7 @@ describe("authenticateRequest", () => {
         keyHash: { in: apiKeyLookupHashes(RAW_KEY) },
         prefix: deriveKeyPrefix(RAW_KEY),
       },
-      select: { id: true, userId: true, name: true, expiresAt: true, scopes: true },
+      select: { id: true, userId: true, name: true, expiresAt: true, scopes: true, rotatedToId: true },
     });
 
     // lastUsed / request log are fire-and-forget writes.

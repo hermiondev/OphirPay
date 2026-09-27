@@ -37,6 +37,7 @@
 | `/api/keys` | POST | 🔑 | Generate API key |
 | `/api/keys` | PATCH | 🔑 | Update key scopes |
 | `/api/keys` | DELETE | 🔑 | Revoke API key |
+| `/api/keys/[id]/rotate` | POST | 🔑 | Rotate API key — replacement + overlap window (#805) |
 | `/api/payments` | POST | 🔑 | Create payment |
 | `/api/payments/[id]` | PATCH | 🔑 | Update payment status |
 | `/api/payments/[id]` | DELETE | 🔑 | Soft-delete payment |

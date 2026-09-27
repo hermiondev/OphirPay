@@ -1298,6 +1298,65 @@ paths:
         "400":
           description: Missing key ID
 
+  /api/keys/{id}/rotate:
+    post:
+      tags: [API Keys]
+      summary: Rotate an API key (replacement + overlap window, issue #805)
+      security: [{ ApiKeyAuth: [] }, { BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+          description: ID of the key being rotated
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                overlapMs:
+                  type: integer
+                  description: >
+                    Overlap window in milliseconds during which the old key
+                    keeps authenticating. Clamped to [60000, 2592000000];
+                    defaults to 86400000 (24h).
+      responses:
+        "201":
+          description: >
+            Replacement key issued (raw key shown once). The old key remains
+            valid until overlapEndsAt, then authenticates as rejected with
+            reason expired_after_rotation.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, const: true }
+                  data:
+                    type: object
+                    properties:
+                      id: { type: string }
+                      name: { type: string }
+                      prefix: { type: string }
+                      scopes:
+                        type: array
+                        items: { type: string }
+                      key:
+                        type: string
+                        description: Raw replacement key — shown only once
+                      oldKeyId: { type: string }
+                      overlapEndsAt:
+                        type: string
+                        format: date-time
+        "400":
+          description: Invalid overlapMs or key already rotated
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Key not found
+
   /api/keys/stats:
     get:
       tags: [API Keys]
