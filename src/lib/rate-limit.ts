@@ -139,6 +139,10 @@ export class RedisRateLimitStore implements RateLimitStore {
 // works on the Edge runtime, so it is what `src/proxy.ts` uses when an
 // HTTP(S) REDIS_URL/REDIS_REST_URL is configured.
 
+/** Default per-command bound for the Redis REST transport. A stalled Upstash
+ * endpoint must never hang the edge middleware that awaits it. */
+const REDIS_REST_TIMEOUT_MS = 5_000;
+
 export interface HttpRedisRateLimitStoreOptions {
   /** REST endpoint, e.g. https://eu1-xxxx.upstash.io */
   url: string;
@@ -146,17 +150,22 @@ export interface HttpRedisRateLimitStoreOptions {
   token?: string;
   /** Injectable fetch (tests). Defaults to the global fetch. */
   fetchImpl?: typeof fetch;
+  /** Per-command timeout in ms (default 5000). 0 disables the bound. */
+  timeoutMs?: number;
 }
 
 export class HttpRedisRateLimitStore implements RateLimitStore {
   private readonly url: string;
   private readonly token?: string;
   private readonly fetchImpl: typeof fetch;
+  private readonly timeoutMs: number;
 
   constructor(opts: HttpRedisRateLimitStoreOptions) {
     this.url = opts.url.replace(/\/+$/, "");
     this.token = opts.token;
     this.fetchImpl = opts.fetchImpl ?? fetch;
+    // ?? so an explicit timeoutMs: 0 disables the bound intentionally.
+    this.timeoutMs = opts.timeoutMs ?? REDIS_REST_TIMEOUT_MS;
   }
 
   private async command(command: (string | number)[]): Promise<unknown> {
@@ -167,6 +176,9 @@ export class HttpRedisRateLimitStore implements RateLimitStore {
         ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
       },
       body: JSON.stringify(command),
+      ...(this.timeoutMs > 0
+        ? { signal: AbortSignal.timeout(this.timeoutMs) }
+        : {}),
     });
 
     if (!response.ok) {
