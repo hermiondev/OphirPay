@@ -21,6 +21,8 @@ interface ApiKeyRecord {
   lastUsed: string | null;
   createdAt: string;
   expiresAt: string | null;
+  rotatedToId?: string | null;
+  rotatedFromId?: string | null;
 }
 
 interface KeyUsage {
@@ -65,6 +67,11 @@ export default function ApiKeysPage() {
   // Edit panel
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editScopes, setEditScopes] = useState<ApiScope[]>([]);
+
+  // Rotation (issue #805)
+  const [rotatingId, setRotatingId] = useState<string | null>(null);
+  const [rotatedRawKey, setRotatedRawKey] = useState<string | null>(null);
+  const [rotationOverlapEnd, setRotationOverlapEnd] = useState<string | null>(null);
 
   // Usage-stats window
   const [window, setWindow] = useState("30d");
@@ -170,6 +177,36 @@ export default function ApiKeysPage() {
       loadKeys();
     } catch {
       toast.error("Delete failed", "Please try again.");
+    }
+  };
+
+  const handleRotate = async (id: string) => {
+    setRotatingId(id);
+    try {
+      const res = await fetch(`/api/keys/${encodeURIComponent(id)}/rotate`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.data?.key) {
+        throw new Error(json?.error?.message ?? "Failed to rotate key");
+      }
+      setRotatedRawKey(json.data.key);
+      setRotationOverlapEnd(json.data.overlapEndsAt ?? null);
+      toast.success(
+        "Key rotated",
+        "The old key stays valid until the overlap window closes."
+      );
+      loadKeys();
+    } catch (err) {
+      toast.error(
+        "Rotation failed",
+        err instanceof Error ? err.message : "Unknown error"
+      );
+    } finally {
+      setRotatingId(null);
     }
   };
 
@@ -307,6 +344,22 @@ export default function ApiKeysPage() {
           Your API keys
         </h2>
 
+        {rotatedRawKey && (
+          <div className="mb-4 p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+            <p className="text-sm text-green-700 dark:text-green-400 font-medium mb-2">
+              New key issued — copy it now. The previous key keeps working until{" "}
+              {rotationOverlapEnd ? formatDate(rotationOverlapEnd) : "the overlap window closes"},
+              then it is rejected with reason “expired after rotation”.
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 break-all text-xs font-mono text-gray-800 dark:text-gray-200 bg-white dark:bg-gray-900 p-2 rounded">
+                {rotatedRawKey}
+              </code>
+              <CopyButton value={rotatedRawKey} label="Key" />
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">Loading…</p>
         ) : keys.length === 0 ? (
@@ -332,6 +385,26 @@ export default function ApiKeysPage() {
                         ? ` · last used ${new Date(key.lastUsed).toLocaleDateString()}`
                         : ""}
                     </p>
+                    {/* Rotation state (issue #805) */}
+                    {key.rotatedToId && key.expiresAt && new Date(key.expiresAt) > new Date() ? (
+                      <p className="mt-1">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
+                          rotated — valid until {formatDate(key.expiresAt)}
+                        </span>
+                      </p>
+                    ) : key.rotatedToId && key.expiresAt ? (
+                      <p className="mt-1">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300">
+                          expired — replaced key required
+                        </span>
+                      </p>
+                    ) : key.rotatedFromId ? (
+                      <p className="mt-1">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
+                          replacement of rotated key
+                        </span>
+                      </p>
+                    ) : null}
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       {key.scopes.length === 0 ? (
                         <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
@@ -356,6 +429,16 @@ export default function ApiKeysPage() {
                     >
                       Edit scopes
                     </button>
+                    {!key.rotatedToId && (
+                      <button
+                        onClick={() => handleRotate(key.id)}
+                        disabled={rotatingId === key.id}
+                        title="Issue a replacement key with the same scopes; this key stays valid during the overlap window"
+                        className="px-3 py-1.5 rounded-lg border border-ophir-200 dark:border-ophir-800 text-ophir-700 dark:text-ophir-300 text-xs font-medium hover:bg-ophir-50 dark:hover:bg-ophir-950/30 disabled:opacity-50"
+                      >
+                        {rotatingId === key.id ? "Rotating..." : "Rotate"}
+                      </button>
+                    )}
                     <button
                       onClick={() => handleDelete(key.id)}
                       className="px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-xs font-medium hover:bg-red-50 dark:hover:bg-red-950/30"

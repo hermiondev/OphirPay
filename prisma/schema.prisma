@@ -715,6 +715,12 @@ model ApiKey {
   createdAt DateTime @default(now())
   /// Optional expiry — the key stops working after this time.
   expiresAt DateTime?
+  /// Rotation lineage (issue #805): id of the replacement key issued by
+  /// rotating this one. While set, this key remains valid only until
+  /// `expiresAt` (the end of the overlap window).
+  rotatedToId String?
+  /// Rotation lineage (issue #805): id of the key this one replaced.
+  rotatedFromId String?
 
   /// Owner of this key (see User).
   user      User     @relation(fields: [userId], references: [id])
@@ -724,6 +730,9 @@ model ApiKey {
   @@index([userId])
   /// Speeds up prefix-based identification lookups.
   @@index([prefix])
+  /// Rotation lineage lookups (issue #805).
+  @@index([rotatedToId])
+  @@index([rotatedFromId])
 }
 
 /// One recorded request made with an API key — used to aggregate usage by

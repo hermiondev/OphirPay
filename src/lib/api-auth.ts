@@ -170,6 +170,10 @@ export interface AuthResult {
   keyId: string;
   keyName: string;
   scopes: string[];
+  /// Set when a key presented for auth was found but rejected, so callers
+  /// (and the keys page) can surface WHY (issue #805). `expired` covers both
+  /// plain expiry and rotation-overlap expiry.
+  rejection?: "expired" | "expired_after_rotation";
 }
 
 /**
@@ -179,6 +183,19 @@ export interface AuthResult {
  * rather than scanning every row — safe at any key volume.
  */
 export async function authenticateRequest(
+  request: Request
+): Promise<AuthResult | null> {
+  const outcome = await authenticateRequestDetailed(request);
+  return outcome && !outcome.rejection ? outcome : null;
+}
+
+/**
+ * Like `authenticateRequest` but returns a `rejection` reason instead of
+ * null when the key exists but is expired — either plain expiry or the end
+ * of a rotation overlap window (issue #805). Callers that need to tell the
+ * user "this key was rotated and its overlap closed on X" use this.
+ */
+export async function authenticateRequestDetailed(
   request: Request
 ): Promise<AuthResult | null> {
   const rawKey = extractApiKey(request);
@@ -200,13 +217,25 @@ export async function authenticateRequest(
         name: true,
         expiresAt: true,
         scopes: true,
+        rotatedToId: true,
       },
     });
 
     if (!apiKey) return null;
 
-    // Check expiration
-    if (apiKey.expiresAt && apiKey.expiresAt < new Date()) return null;
+    // Check expiration — with rotation lineage, distinguish the reason so the
+    // consumer can act on it (issue #805 acceptance criteria).
+    if (apiKey.expiresAt && apiKey.expiresAt < new Date()) {
+      return {
+        userId: apiKey.userId,
+        keyId: apiKey.id,
+        keyName: apiKey.name,
+        scopes: apiKey.scopes ?? [],
+        rejection: apiKey.rotatedToId
+          ? "expired_after_rotation"
+          : "expired",
+      };
+    }
 
     // Update lastUsed — fire-and-forget so auth latency is not gated on this write
     prisma.apiKey

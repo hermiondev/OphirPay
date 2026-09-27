@@ -62,6 +62,8 @@ export const GET = withMetrics("GET /api/keys", withRequestLogging(async functio
         lastUsed: true,
         createdAt: true,
         expiresAt: true,
+        rotatedToId: true,
+        rotatedFromId: true,
       },
     });
     return successResponse(keys);
