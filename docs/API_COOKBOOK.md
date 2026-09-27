@@ -82,6 +82,7 @@ Complete list of every endpoint declared in [`docs/openapi.yaml`](openapi.yaml).
 | `/api/webhooks/{id}/deliveries` | GET |
 | `/api/webhooks/{id}/deliveries/{deliveryId}/redeliver` | POST |
 | `/api/keys` | GET, POST, PATCH, DELETE |
+| `/api/keys/{id}/rotate` | POST |
 | `/api/keys/stats` | GET |
 | `/api/multisig` | GET, POST |
 | `/api/multisig/propose` | POST |
@@ -161,13 +162,40 @@ curl -X GET "https://api.ophirpay.com/api/keys" \
 ### Revoke an API Key
 ```bash
 curl -X DELETE "https://api.ophirpay.com/api/keys/key_01hv89q7a4mpx3n" \
-  -H "Authorization: Bearer ophir_live_sk_8f7b2c9e4a1d0f62b8e3c1a9"
+  -H "Authorization: Bearer ophir_...c1a9"
 ```
 **Response (`200 OK`):**
 ```json
 {
   "success": true,
   "message": "API key revoked successfully."
+}
+```
+
+### Rotate an API Key (overlap window)
+Issues a replacement key with identical scopes. The old key keeps working
+until `overlapEndsAt` (default 24h, clamped 1 min–30 d), then it is rejected
+with reason `expired_after_rotation`. Revoking the old key closes the window
+early.
+```bash
+curl -X POST "https://api.ophirpay.com/api/keys/key_01hv89q7a4mpx3n/rotate" \
+  -H "Authorization: Bearer ophir_...c1a9" \
+  -H "Content-Type: application/json" \
+  -d '{"overlapMs": 86400000}'
+```
+**Response (`201 Created`):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "key_01hv89r0b7kq2m5",
+    "name": "Production server",
+    "prefix": "oph_ab12",
+    "scopes": ["read:payments"],
+    "key": "oph_...shown once...",
+    "oldKeyId": "key_01hv89q7a4mpx3n",
+    "overlapEndsAt": "2026-09-28T05:50:00.000Z"
+  }
 }
 ```
 
