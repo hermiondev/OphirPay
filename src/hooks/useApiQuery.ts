@@ -132,7 +132,12 @@ export function useApiQuery<T>(
   }
   return useQuery<T, ApiError>({
     queryKey: key,
-    queryFn: queryFn ?? (() => apiFetch<T>(url ?? "")),
+    // Forward React Query's abort signal so cancellations (component unmount,
+    // key change, manual invalidate/cancel) actually abort the in-flight
+    // request instead of silently continuing to completion.
+    queryFn: queryFn
+      ? () => queryFn()
+      : ({ signal }) => apiFetch<T>(url ?? "", { signal }),
     ...options,
   });
 }
