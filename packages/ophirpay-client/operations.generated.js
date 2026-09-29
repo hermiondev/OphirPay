@@ -2,7 +2,7 @@
 // GENERATED FROM docs/openapi.yaml — DO NOT EDIT BY HAND.
 // Regenerate with: npm run client:generate
 //
-// 91 operations extracted from the committed OpenAPI spec.
+// 92 operations extracted from the committed OpenAPI spec.
 
 /** @typedef {{ name: string, method: string, path: string, summary: string, tags: string[], requestBody: boolean }} ApiOperation */
 
@@ -743,6 +743,16 @@ export const API_OPERATIONS = [
     "method": "POST",
     "path": "/api/keys",
     "summary": "Generate a new API key (raw key shown once)",
+    "tags": [
+      "API Keys"
+    ],
+    "requestBody": true
+  },
+  {
+    "name": "postApiKeysIdRotate",
+    "method": "POST",
+    "path": "/api/keys/{id}/rotate",
+    "summary": "Rotate an API key (replacement + overlap window, issue",
     "tags": [
       "API Keys"
     ],

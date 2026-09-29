@@ -86,6 +86,7 @@ export type ApiOperationName =
   | "postApiHooks"
   | "postApiJobsProcessDueRecurring"
   | "postApiKeys"
+  | "postApiKeysIdRotate"
   | "postApiMultisig"
   | "postApiMultisigApprove"
   | "postApiMultisigExecute"
